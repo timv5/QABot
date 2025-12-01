@@ -9,3 +9,10 @@ This project is a fully private and fully offline alternative to cloud-based AI 
 
 ## How does it work? 
 User question → Embedding → Vector DB → Retrieve top chunks → Construct prompt → LLM generates answer → Return to user
+
+
+## Internal notes
+- sudo apt update
+- sudo apt python3 -m venv .venv
+- source .venv/bin/activate
+- pip install sentence-transformers python-docx psycopg2-binary // local embedding model, read word docs, connect to postgres
