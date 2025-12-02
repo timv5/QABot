@@ -82,8 +82,48 @@ docker-compose up -d
 ### 6. Start QA processor
 ```python llm-processor/qa.py```
 
-# Example
+### 7. Start http server
+```cd /llm-processor```
+And then run either (api or cli mode):
+```python qa.py --mode cli```
+```python qa.py --mode api```
+
+
+## CLI Example
 You: What does the policy say about vacations?
 Bot: ...
 Sources:
 - hr_policy.docx (chunk 3)
+
+## API Example
+Request:
+```
+curl -X POST "http://localhost:8000/ask" \
+-H "Content-Type: application/json" \
+-d '{"question": "What is VectorDesk?", "top_k": 5}'
+```
+
+Response:
+```
+{
+  "answer": "Lorem Ipsum is simply dummy text of the printing and typesetting industry, originating from sections 1.10.32 and 1.10.33 of \"de Finibus Bonorum et Malorum\" by Cicero, written in 45 BC.",
+  "sources": [
+    {
+      "doc_id": "dummy.docx",
+      "chunk_index": 2
+    },
+    {
+      "doc_id": "dummy.docx",
+      "chunk_index": 0
+    },
+    {
+      "doc_id": "dummy.docx",
+      "chunk_index": 3
+    },
+    {
+      "doc_id": "dummy.docx",
+      "chunk_index": 1
+    }
+  ]
+}
+```

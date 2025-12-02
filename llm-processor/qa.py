@@ -5,6 +5,9 @@ import psycopg2
 from sentence_transformers import SentenceTransformer
 import requests
 
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
 
 # === CONFIG ===
 DB_DSN = "dbname=localmind user=localmind password=localmind host=localhost port=5434"
@@ -13,6 +16,7 @@ OLLAMA_MODEL = "llama3.2"
 
 embedder = SentenceTransformer(EMBED_MODEL_NAME)
 
+app = FastAPI(title="VectorDesk QA API")
 
 def embed_text(text: str) -> str:
     """
@@ -24,7 +28,7 @@ def embed_text(text: str) -> str:
     return pg_array
 
 
-def retrieve_context(question: str, top_k: int = 5) -> list[tuple[Any, ...]]:
+def retrieve_context(question: str, top_k: int = 5) -> List[Tuple[Any, ...]]:
     """
     Retrieve the top_k most similar chunks from vector_desk.document_chunks
     based on the question embedding.
@@ -48,6 +52,7 @@ def retrieve_context(question: str, top_k: int = 5) -> list[tuple[Any, ...]]:
     conn.close()
 
     return rows
+
 
 def call_llm(prompt: str) -> str:
     """
@@ -73,6 +78,7 @@ def call_llm(prompt: str) -> str:
             break
 
     return text
+
 
 def build_prompt(question: str, context_rows: List[Tuple[str, int, str]]) -> str:
     """
@@ -100,8 +106,12 @@ def build_prompt(question: str, context_rows: List[Tuple[str, int, str]]) -> str
             """
     return prompt
 
-def answer(question: str) -> tuple[str, list[Any]] | tuple[str, list[tuple[Any, ...]]]:
-    context_rows = retrieve_context(question)
+
+def answer(question: str, top_k: int = 5) -> Tuple[str, List[Tuple[Any, ...]]]:
+    """
+    High-level helper to get an answer + context rows.
+    """
+    context_rows = retrieve_context(question, top_k=top_k)
     if not context_rows:
         return "I couldn't find any relevant documents.", []
 
@@ -110,9 +120,48 @@ def answer(question: str) -> tuple[str, list[Any]] | tuple[str, list[tuple[Any, 
     return response_text.strip(), context_rows
 
 
-# === SIMPLE CLI LOOP ===
+# === HTTP API MODELS ===
 
-if __name__ == "__main__":
+class AskRequest(BaseModel):
+    question: str
+    top_k: int = 5
+
+
+class Source(BaseModel):
+    doc_id: Any
+    chunk_index: int
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: List[Source]
+
+
+# === HTTP ENDPOINT ===
+
+@app.post("/ask", response_model=AskResponse)
+def ask(req: AskRequest) -> AskResponse:
+    """
+    POST /ask
+    {
+      "question": "your question",
+      "top_k": 5
+    }
+    """
+    try:
+        answer_text, ctx_rows = answer(req.question, top_k=req.top_k)
+        sources = [
+            Source(doc_id=row[0], chunk_index=row[1])
+            for row in ctx_rows
+        ]
+        return AskResponse(answer=answer_text, sources=sources)
+    except Exception as e:
+        # You can log here if you want
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+def run_cli():
     print("Local QA bot. Type your question, or 'exit' to quit.")
     while True:
         q = input("\nYou: ")
@@ -130,3 +179,17 @@ if __name__ == "__main__":
         print("\nSources (documents used):")
         for doc_id, chunk_index, _ in ctx:
             print(f" - {doc_id} (chunk {chunk_index})")
+
+
+if __name__ == "__main__":
+    import argparse
+    import uvicorn
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["cli", "api"], default="cli")
+    args = parser.parse_args()
+
+    if args.mode == "cli":
+        run_cli()
+    else:
+        uvicorn.run("qa:app", host="0.0.0.0", port=8000, reload=False)
