@@ -58,41 +58,6 @@ Located in /infrastructure folder.
 - The ingestion processor can be rerun when documents change
 - Retrieval uses pgvector <-> distance for similarity ranking
 
-## Setup
-
-### 1. Start Postgres with pgvector
-
-From the `infrastructure/` directory:
-
-```
-docker-compose up -d
-```
-
-### 2. Prepare Python environment
-- ```python3 -m venv .venv```
-- ```source .venv/bin/activate```
-- ```pip install -r requirements.txt```
-
-### 3. Place .docx files in:
-- embeddings-processor/data/
-
-### 4. Run ingestion script
-```python embeddings-processor/index_docs.py```
-
-### 5. Set Ollama and verify
-```ollama pull llama3.2```
-```curl http://localhost:11434/api/tags```
-
-### 6. Start QA processor
-```python llm-processor/qa.py```
-
-### 7. Start http server
-```cd /llm-processor```
-And then run either (api or cli mode):
-```python qa.py --mode cli```
-```python qa.py --mode api```
-
-
 ## CLI Example
 You: What does the policy say about vacations?
 Bot: ...
